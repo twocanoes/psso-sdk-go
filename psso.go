@@ -1,4 +1,4 @@
-package main
+package psso
 
 import (
 	"crypto/aes"
