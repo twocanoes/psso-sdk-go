@@ -6,9 +6,11 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/x509"
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"time"
 
@@ -17,6 +19,16 @@ import (
 	"github.com/go-jose/go-jose/v3/jwt"
 )
 
+type JWKS struct {
+	PK         string
+	Category   string
+	KID        string
+	X          string
+	Y          string
+	D          string
+	Pem        string
+	privateKey ecdsa.PrivateKey
+}
 type TokenBody struct {
 	JWECrypto struct {
 		Alg string `json:"alg"`
@@ -31,7 +43,6 @@ type TokenBody struct {
 	Password     string `json:"password"`
 	Sub          string `json:"sub"`
 	Aud          string `json:"aud"`
-	//Iat          int `json:"iat,omitempty"`
 	Username     string `json:"username"`
 	ClientID     string `json:"client_id"`
 	RefreshToken string `json:"refresh_token"`
@@ -129,7 +140,21 @@ func createIDTokenWithTime(issuer string, aud string, shortname string, fullname
 
 	return returnClaims
 }
+func ECPublicKeyFromPEM(publicKeyPEM string) any {
 
+	publicKeyPemBytes := []byte(publicKeyPEM)
+	publicKeyBlock, _ := pem.Decode(publicKeyPemBytes)
+	publicKey, _ := x509.ParsePKIXPublicKey(publicKeyBlock.Bytes)
+	return publicKey
+
+}
+func ECPrivateKeyFromPEM(privateKeyPEM string) *ecdsa.PrivateKey {
+	pemBytes := []byte(privateKeyPEM)
+	pemblock, _ := pem.Decode(pemBytes)
+	jwksPrivKey, _ := x509.ParseECPrivateKey(pemblock.Bytes)
+
+	return jwksPrivKey
+}
 func VerifyJWTAndReturnClaims(tokenString string, publicKey any) *TokenBody {
 
 	//take the tokenString sent in and parse it into a Go JWT
@@ -242,7 +267,9 @@ func encyptTokenWithA256GCMWithEphemeralKey(idToken string, refreshToken string,
 }
 
 // The id token is encrypted with a derived key from the private key from the service.
-func EncyptTokenWithA256GCM(idToken string, refreshToken string, encryptionKey *ecdsa.PrivateKey, apv []byte, nonce []byte) string {
+func EncyptTokenWithA256GCM(idToken string, refreshToken string, encryptionKey *ecdsa.PrivateKey, apv []byte) string {
+
+	nonce := make([]byte, 12) //all zeros but should be a random 12 bytes.
 
 	//make an ephermal key
 	ephermalKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
