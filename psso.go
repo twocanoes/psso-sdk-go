@@ -156,7 +156,7 @@ func VerifyJWTAndReturnClaims(tokenString string, publicKey any) *TokenBody {
 }
 
 // Sign the ID token
-func signToken(privateKey *ecdsa.PrivateKey, keyID string, idClaims *IDTokenClaims) string {
+func SignToken(privateKey *ecdsa.PrivateKey, keyID string, idClaims *IDTokenClaims) string {
 
 	var key jose.JSONWebKey
 	key.Algorithm = "ES256"
