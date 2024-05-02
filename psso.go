@@ -115,6 +115,14 @@ type LoginResponseBody struct {
 	TokenType           string `json:"token_type"`
 }
 
+type TokenType int
+
+const (
+	UserAuth    TokenType = iota
+	KeyRequest  TokenType = iota
+	KeyExchange TokenType = iota
+)
+
 func CreateIDToken(issuer string, aud string, shortname string, fullname string, groups []string, nonce string, email string, upn string) *IDTokenClaims {
 
 	exp := int(time.Now().Add(time.Hour).Unix())
@@ -140,12 +148,12 @@ func createIDTokenWithTime(issuer string, aud string, shortname string, fullname
 
 	return returnClaims
 }
-func ECPublicKeyFromPEM(publicKeyPEM string) any {
+func ECPublicKeyFromPEM(publicKeyPEM string) *ecdsa.PublicKey {
 
 	publicKeyPemBytes := []byte(publicKeyPEM)
 	publicKeyBlock, _ := pem.Decode(publicKeyPemBytes)
 	publicKey, _ := x509.ParsePKIXPublicKey(publicKeyBlock.Bytes)
-	return publicKey
+	return publicKey.(*ecdsa.PublicKey)
 
 }
 func ECPrivateKeyFromPEM(privateKeyPEM string) *ecdsa.PrivateKey {
@@ -155,7 +163,7 @@ func ECPrivateKeyFromPEM(privateKeyPEM string) *ecdsa.PrivateKey {
 
 	return jwksPrivKey
 }
-func VerifyJWTAndReturnClaims(tokenString string, publicKey any) *TokenBody {
+func VerifyJWTAndReturnUserClaims(tokenString string, publicKey any) *TokenBody {
 
 	//take the tokenString sent in and parse it into a Go JWT
 	token, err := jwt.ParseSigned(tokenString)
@@ -179,9 +187,33 @@ func VerifyJWTAndReturnClaims(tokenString string, publicKey any) *TokenBody {
 	return tokenBody
 
 }
+func VerifyJWTAndReturnKeyRequestClaims(tokenString string, publicKey any) *KeyRequestBody {
+
+	//take the tokenString sent in and parse it into a Go JWT
+	token, err := jwt.ParseSigned(tokenString)
+
+	if err != nil {
+		panic(err)
+	}
+	if token == nil {
+		panic(token)
+	}
+
+	// pull out the body to verify the signature
+	//get a new TokenBody Object
+	tokenBody := new(KeyRequestBody)
+
+	//Verify signature and populate tokenBody with claims
+	if err = token.Claims(publicKey, &tokenBody); err != nil {
+		fmt.Println(err)
+		panic(err)
+	}
+	return tokenBody
+
+}
 
 // Sign the ID token
-func SignToken(privateKey *ecdsa.PrivateKey, keyID string, idClaims *IDTokenClaims) string {
+func SignToken(privateKey *ecdsa.PrivateKey, keyID string, idClaims interface{}) string {
 
 	var key jose.JSONWebKey
 	key.Algorithm = "ES256"
@@ -206,25 +238,62 @@ func SignToken(privateKey *ecdsa.PrivateKey, keyID string, idClaims *IDTokenClai
 	}
 	return token
 }
-func encyptTokenWithA256GCMWithEphemeralKey(idToken string, refreshToken string, encryptionKey *ecdsa.PrivateKey, apv []byte, nonce []byte, ephermalKey *ecdsa.PrivateKey) string {
+
+func login() {
+
+}
+func encyptTokenWithA256GCMWithEphemeralKey(token string, tokenType TokenType, refreshToken string, encryptionKey *ecdsa.PublicKey, apv []byte, nonce []byte, ephermalKey *ecdsa.PrivateKey) string {
 
 	//get apu (inform about the key)
 	apu := buildAPU(ephermalKey)
 
 	//generate a symeetric key using info about the ephermal key, info about the key on the receiver side,
 	// the key on the service side, and the public key of the the receiver.
-	sharedSecret := josecipher.DeriveECDHES("A256GCM", apu, apv, ephermalKey, &encryptionKey.PublicKey, 32)
+	sharedSecret := josecipher.DeriveECDHES("A256GCM", apu, apv, ephermalKey, encryptionKey, 32)
 
 	//user the shared secret to create a cipher that will be used to encrypt the user info.
 	cipherBlock, _ := aes.NewCipher(sharedSecret)
 	aesgcm, _ := cipher.NewGCM(cipherBlock)
+	var jweBody any
+	var headerType string
 
-	jweBody := &LoginResponseBody{
-		IDToken:             idToken,
-		RefreshToken:        refreshToken,
-		RefreshTokenExpires: 60000,
-		TokenType:           "Bearer",
+	if tokenType == UserAuth {
+		headerType = "platformsso-login-response+jwt"
+
+		jweBody = LoginResponseBody{
+			IDToken:             token,
+			RefreshToken:        refreshToken,
+			RefreshTokenExpires: 60000,
+			TokenType:           "Bearer",
+		}
+		//build up the JWE header so receiver knows how to decrypt.
+
+	} else if tokenType == KeyRequest {
+		// headerType = "platformsso-login-response+jwt"
+
+		// priv, key := GenCert(username)
+
+		// jweBody = KeyResponseBody{
+		// 	Certificate: base64.RawURLEncoding.EncodeToString(key),
+		// 	KeyContext:  base64.RawURLEncoding.EncodeToString(priv),
+		// 	IssuedAt:    int(time.Now().Unix()),
+		// 	Expires:     int(time.Now().Add(time.Minute * 5).Unix()),
+		// }
+
+	} else if tokenType == KeyExchange {
+		// headerType = "platformsso-login-response+jwt"
+
+		// jweBody = KeyResponseBody{
+		// 	Key:        zBytesB64URL,
+		// 	IssuedAt:   int(time.Now().Unix()),
+		// 	Expires:    int(time.Now().Add(time.Minute * 5).Unix()),
+		// 	KeyContext: tokenClaims.KeyContext,
+		// }
+
+	} else {
+		panic("bad key type")
 	}
+
 	jweBodyCompact, err := json.Marshal(jweBody)
 	if err != nil {
 		panic(err.Error())
@@ -241,12 +310,10 @@ func encyptTokenWithA256GCMWithEphemeralKey(idToken string, refreshToken string,
 		KeyType: "EC",
 		Curve:   "P-256",
 	}
-
-	//build up the JWE header so receiver knows how to decrypt.
-	jweHeaders := &LoginResponseHeader{
+	jweHeaders := LoginResponseHeader{
 		Encryption:         "A256GCM",
 		EphemeralPublicKey: *newEPK,
-		Type:               "platformsso-login-response+jwt",
+		Type:               headerType,
 		Algorithm:          "ECDH-ES",
 		APU:                base64.RawURLEncoding.EncodeToString(apu),
 		APV:                string(apv[:]),
@@ -267,7 +334,7 @@ func encyptTokenWithA256GCMWithEphemeralKey(idToken string, refreshToken string,
 }
 
 // The id token is encrypted with a derived key from the private key from the service.
-func EncyptTokenWithA256GCM(idToken string, refreshToken string, encryptionKey *ecdsa.PrivateKey, apv []byte) string {
+func EncyptTokenWithA256GCM(idToken string, tokenType TokenType, refreshToken string, encryptionKey *ecdsa.PublicKey, apv []byte) string {
 
 	nonce := make([]byte, 12) //all zeros but should be a random 12 bytes.
 
@@ -276,7 +343,7 @@ func EncyptTokenWithA256GCM(idToken string, refreshToken string, encryptionKey *
 	if err != nil {
 		panic(err)
 	}
-	return encyptTokenWithA256GCMWithEphemeralKey(idToken, refreshToken, encryptionKey, apv, nonce, ephermalKey)
+	return encyptTokenWithA256GCMWithEphemeralKey(idToken, tokenType, refreshToken, encryptionKey, apv, nonce, ephermalKey)
 }
 
 // APU has information about the service private key
@@ -298,3 +365,35 @@ func lengthPrefixed(data []byte) []byte {
 	copy(out[4:], data)
 	return out
 }
+
+// func GenCert(user string) ([]byte, []byte) {
+
+// 	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+// 	if err != nil {
+// 		panic(err.Error())
+// 	}
+
+// 	template := x509.Certificate{
+// 		SerialNumber: big.NewInt(1),
+// 		Subject: pkix.Name{
+// 			Organization: []string{"JumpCloud Labs"},
+// 		},
+// 		NotBefore: time.Now(),
+// 		NotAfter:  time.Now().Add(time.Hour * 24 * 365),
+
+// 		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+// 		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+// 		BasicConstraintsValid: true,
+// 	}
+
+// 	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, publicKey(priv), priv)
+// 	if err != nil {
+// 	}
+
+// 	out := &bytes.Buffer{}
+// 	pem.Encode(out, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
+// 	out.Reset()
+// 	pem.Encode(out, pemBlockForKey(priv))
+
+// 	return out.Bytes(), derBytes
+// }
