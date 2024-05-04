@@ -9,6 +9,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/binary"
 	"encoding/pem"
+	"fmt"
 	"math/big"
 	"time"
 )
@@ -21,12 +22,12 @@ import (
 // Returns:
 // pointer to ecdsa.PublicKey
 
-func ECPublicKeyFromPEM(publicKeyPEM string) *ecdsa.PublicKey {
+func ECPublicKeyFromPEM(publicKeyPEM string) (*ecdsa.PublicKey, error) {
 
 	publicKeyPemBytes := []byte(publicKeyPEM)
 	publicKeyBlock, _ := pem.Decode(publicKeyPemBytes)
-	publicKey, _ := x509.ParsePKIXPublicKey(publicKeyBlock.Bytes)
-	return publicKey.(*ecdsa.PublicKey)
+	publicKey, err := x509.ParsePKIXPublicKey(publicKeyBlock.Bytes)
+	return publicKey.(*ecdsa.PublicKey), err
 
 }
 
@@ -38,12 +39,12 @@ func ECPublicKeyFromPEM(publicKeyPEM string) *ecdsa.PublicKey {
 // Returns:
 // pointer to ecdsa.PublicKey
 
-func ECPrivateKeyFromPEM(privateKeyPEM string) *ecdsa.PrivateKey {
+func ECPrivateKeyFromPEM(privateKeyPEM string) (*ecdsa.PrivateKey, error) {
 	pemBytes := []byte(privateKeyPEM)
 	pemblock, _ := pem.Decode(pemBytes)
-	jwksPrivKey, _ := x509.ParseECPrivateKey(pemblock.Bytes)
+	jwksPrivKey, err := x509.ParseECPrivateKey(pemblock.Bytes)
 
-	return jwksPrivKey
+	return jwksPrivKey, err
 }
 
 // Certificate used for persistent token on device. Certificate is require due to how persistent tokens are implemented.
@@ -52,11 +53,11 @@ func ECPrivateKeyFromPEM(privateKeyPEM string) *ecdsa.PrivateKey {
 // Return:
 // tuple of an array of bytes. First value is the ECC private key generated. Second value is the certificate with the public key associated with the private key generated.
 
-func genCert(user string) ([]byte, []byte) {
+func genCert(user string) ([]byte, []byte, error) {
 
 	priv, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	if err != nil {
-		panic(err.Error())
+		return nil, nil, err
 	}
 
 	template := x509.Certificate{
@@ -72,14 +73,28 @@ func genCert(user string) ([]byte, []byte) {
 		BasicConstraintsValid: true,
 	}
 
-	derBytes, _ := x509.CreateCertificate(rand.Reader, &template, &template, publicKey(priv), priv)
+	pubKey, err := publicKey(priv)
+	if err != nil {
+		return nil, nil, err
+
+	}
+	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, pubKey, priv)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	out := &bytes.Buffer{}
 	pem.Encode(out, &pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
 	out.Reset()
-	pem.Encode(out, pemBlockForKey(priv))
+	pemBlock, err := pemBlockForKey(priv)
 
-	return out.Bytes(), derBytes
+	if err != nil {
+		return nil, nil, err
+
+	}
+	pem.Encode(out, pemBlock)
+
+	return out.Bytes(), derBytes, nil
 }
 
 // publicKey()
@@ -89,12 +104,12 @@ func genCert(user string) ([]byte, []byte) {
 // Output:
 // pointer to ecdsa public key
 
-func publicKey(priv interface{}) interface{} {
+func publicKey(priv interface{}) (interface{}, error) {
 	switch k := priv.(type) {
 	case *ecdsa.PrivateKey:
-		return &k.PublicKey
+		return &k.PublicKey, nil
 	default:
-		return nil
+		return nil, fmt.Errorf("publicKey: not ecdsa private key")
 	}
 }
 
@@ -104,15 +119,16 @@ func publicKey(priv interface{}) interface{} {
 // priv: pointer to ecdsa private key
 // Output:
 // PEM block
-func pemBlockForKey(priv interface{}) *pem.Block {
+func pemBlockForKey(priv interface{}) (*pem.Block, error) {
 	switch k := priv.(type) {
 	case *ecdsa.PrivateKey:
 		b, err := x509.MarshalECPrivateKey(k)
 		if err != nil {
+			return nil, err
 		}
-		return &pem.Block{Type: "EC PRIVATE KEY", Bytes: b}
+		return &pem.Block{Type: "EC PRIVATE KEY", Bytes: b}, nil
 	default:
-		return nil
+		return nil, fmt.Errorf("pemBlockForKey: not ecdsa private key")
 	}
 }
 

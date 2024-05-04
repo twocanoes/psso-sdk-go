@@ -134,7 +134,7 @@ type IDTokenResponseBody struct {
 //
 // Return Value: string. JWT token with user ID info in dot notation. Example: "eyJlbmMiOiJBMjU2R0NNIiwia2lkIjoiIiwiZXBrIjp7InkiOiJtYU9RNWRhUVJQWHhTVUZLTmtOSmFOckUzYnlTbFVvTWNoNWt5RVpKUEpJIiwieCI6IjRETFRKNDVtb3pmVjJLTDRJUUJUWGN2R29HSmc0UjRVaDdwRTE5aHVmUzgiLCJrdHkiOiJFQyIsImNydiI6IlAtMjU2In0sImFwdSI6IkFBQUFCVUZRVUV4RkFBQUFRUVRnTXRNbmptYWpOOVhZb3ZnaEFGTmR5OGFnWW1EaEhoU0h1a1RYMkc1OUw1bWprT1hXa0VUMThVbEJTalpEU1dqYXhOMjhrcFZLREhJZVpNaEdTVHlTIiwidHlwIjoicGxhdGZvcm1zc28tbG9naW4tcmVzcG9uc2Urand0IiwiYWxnIjoiRUNESC1FUyIsImFwdiI6IkFBQUFCVUZ3Y0d4bEFBQUFRUVRzVDhYT1dKTkZBRnNjOXlBR21JRUJYak1YLWF6NG5ZcGJ3Qkh1YXZTT3hLQ1IwS2VJVDFyUXpCT1dGcWticmx5MTlEdDJUaFRYd29VZWFBcFU0ZFZTQUFBQUpEZEVOekZHT0VJMExURkVSVGN0TkVZNE9TMDRRek5CTFRJeE1FUXhOakZHTXpoQlF3In0..m3jFtRsFFYCJfEX6.hFd4vIvPfRf87NrOfYUoxIWWevc4cEyj9DOA4w6OXi5rfUeNg0KX9Vwa7ZqAgaHkiO9sdD1NaCNRdZ0Q5rICoNBWEbHKpTFvOpp7j_Aq2hbxwHZV62JG63keMPT17iQ68v7-mN0NB7LXLuhpx95zIQxg5xTTu0JcrsAu1mAvB7iWRBBDhgnk6YtMzlRrMiuuVE-rjx7fSir4ri2f9Km4zvwE6VtDMO6FnwfOMO0TB2wvFEFIkWHpEp0dpgnyLCoK0UeaCbQ0oWVNpOdgNk6vWXak6c9wvhjXJlo4kVfdV5yEQlhL6WquiN9KeEhFro_4BjyBON1Q6_hU8XzzbNtZFyjC31R22ClBNnVG4Z_YaZ67bCTbLijXxFGjsGeDyFYQJWb1p62kJt5Ba3wd9dzV5xer8L86q5L2ZAJizag11kg3mZZaGa_OgrEuew2NlcrwgLhfiroc4fs-p4gfdf3N9ThJIpSQGqvtK0IXE_XzaU9EVICozI__ed9tibsaGrqtpyE4bXK1WkuxLgJI55GbABypS6grdr-gcKjcFB3su_Y--j0ovjpy1hgQahYmYLz5TniTgE7yjmMEEk_arroSpOTxamVx3WbR5ukEO1-PYp9iPaL7jeVxohS9dlVwsYyao5LIvU3Bu4PK4PbwhzBvXhwUp9pBgqjFbdJ44kIftmKNy2obocbdR7t2ZiibkwNUXbY_bYJcy28KZ6QRei1Nl6LvdzHI_maHlIFiVp3nYmD2YQYyntZFvKP-T0GlL0LgxOJr6_vswQ6DvKuJXvs4JjxJAEHrX5yWsfPjQc9l3iTGgb6vPGgh0nx26JND71Ij.6dI5jzJ-ouTEcvbfH34ixw
 
-func CreateIDTokenResponse(requestClaims IDTokenRequestBody, shortname string, fullname string, groups []string, email string, upn string, refreshToken string, servicePrivateKey *ecdsa.PrivateKey, serviceKeyID string, devicePublicKey *ecdsa.PublicKey) string {
+func CreateIDTokenResponse(requestClaims IDTokenRequestBody, shortname string, fullname string, groups []string, email string, upn string, refreshToken string, servicePrivateKey *ecdsa.PrivateKey, serviceKeyID string, devicePublicKey *ecdsa.PublicKey) (string, error) {
 
 	// build up user information to send back
 	returnClaims := &IDTokenClaims{
@@ -150,7 +150,10 @@ func CreateIDTokenResponse(requestClaims IDTokenRequestBody, shortname string, f
 		Name:    fullname,
 	}
 
-	signedReturnClaims := SignClaims(servicePrivateKey, serviceKeyID, returnClaims)
+	signedReturnClaims, err := SignClaims(servicePrivateKey, serviceKeyID, returnClaims)
+	if err != nil {
+		return "", err
+	}
 
 	jweBody := IDTokenResponseBody{
 		IDToken:             signedReturnClaims,
@@ -158,10 +161,14 @@ func CreateIDTokenResponse(requestClaims IDTokenRequestBody, shortname string, f
 		RefreshTokenExpires: 60000,
 		TokenType:           "Bearer",
 	}
-	jweBodyCompact, _ := json.Marshal(jweBody)
+	jweBodyCompact, err := json.Marshal(jweBody)
 
-	jwe := EncryptTokenWithA256GCM(jweBodyCompact, devicePublicKey, requestClaims.JWECrypto.Apv)
-	return jwe
+	if err != nil {
+		return "", err
+	}
+
+	jwe, err := EncryptTokenWithA256GCM(jweBodyCompact, devicePublicKey, requestClaims.JWECrypto.Apv)
+	return jwe, nil
 }
 
 // CreateKeyRequestResponseClaims PSSO v2
@@ -172,9 +179,12 @@ func CreateIDTokenResponse(requestClaims IDTokenRequestBody, shortname string, f
 // Return Value:
 // string. Encrypted JWT (JWE) in dot notation.
 
-func CreateKeyRequestResponseClaims(requestClaims KeyRequestBody, devicePublicKey *ecdsa.PublicKey) string {
-	certificatePrivateKey, certificate := genCert(requestClaims.Username)
+func CreateKeyRequestResponseClaims(requestClaims KeyRequestBody, devicePublicKey *ecdsa.PublicKey) (string, error) {
+	certificatePrivateKey, certificate, err := genCert(requestClaims.Username)
 
+	if err != nil {
+		return "", err
+	}
 	jweBody := KeyResponseBody{
 		Certificate: base64.RawURLEncoding.EncodeToString(certificate),
 		KeyContext:  base64.RawURLEncoding.EncodeToString(certificatePrivateKey),
@@ -183,8 +193,11 @@ func CreateKeyRequestResponseClaims(requestClaims KeyRequestBody, devicePublicKe
 	}
 	jweBodyCompact, _ := json.Marshal(jweBody)
 
-	jwe := EncryptTokenWithA256GCM(jweBodyCompact, devicePublicKey, requestClaims.JWECrypto.Apv)
-	return jwe
+	jwe, err := EncryptTokenWithA256GCM(jweBodyCompact, devicePublicKey, requestClaims.JWECrypto.Apv)
+	if err != nil {
+		return "", err
+	}
+	return jwe, nil
 
 }
 
@@ -196,7 +209,7 @@ func CreateKeyRequestResponseClaims(requestClaims KeyRequestBody, devicePublicKe
 // Return Value:
 // string. Encrypted JWT (JWE) in dot notation.
 
-func CreateKeyExchangeResponseClaims(requestClaims KeyRequestBody, devicePublicKey *ecdsa.PublicKey) string {
+func CreateKeyExchangeResponseClaims(requestClaims KeyRequestBody, devicePublicKey *ecdsa.PublicKey) (string, error) {
 
 	// When the unlock operation is requested, an ephemeral key is generated on the device side and used to generate
 	// a secret that can be used to unlock FV or keychain. The service side uses the public key of this ephemeral key
@@ -204,13 +217,22 @@ func CreateKeyExchangeResponseClaims(requestClaims KeyRequestBody, devicePublicK
 	// to unlock the keychain or filevault.
 
 	// Get the private key used to decrypt from the keycontext.
-	keyExchangePrivateKeyPEMString, _ := base64.RawURLEncoding.DecodeString(requestClaims.KeyContext)
-	keyExchangePrivateKeyBlock, _ := pem.Decode(keyExchangePrivateKeyPEMString)
+	keyExchangePrivateKeyPEMString, err := base64.RawURLEncoding.DecodeString(requestClaims.KeyContext)
+
+	if err != nil {
+		return "", nil
+	}
+
+	keyExchangePrivateKeyBlock, p := pem.Decode(keyExchangePrivateKeyPEMString)
+	if p == nil {
+		return "", fmt.Errorf("CreateKeyExchangeResponseClaims: pem error")
+	}
 
 	//persistant token key
 	keyExchangePrivateKey, err := x509.ParseECPrivateKey(keyExchangePrivateKeyBlock.Bytes)
 	if err != nil {
 		fmt.Println("error rehydrating the device private key")
+		return "", err
 	}
 
 	//get the public key from the device side
@@ -218,13 +240,14 @@ func CreateKeyExchangeResponseClaims(requestClaims KeyRequestBody, devicePublicK
 	deviceEphemeralPublicKey, err := base64.StdEncoding.DecodeString(requestClaims.OtherPublicKey)
 
 	if err != nil {
-		panic(err.Error())
+		return "", nil
 	}
 
 	//take device public key (x, y values) and the private key associated with the certificate and get the secret (z)
 	// base64 encode this.
 	x, y := elliptic.Unmarshal(elliptic.P256(), deviceEphemeralPublicKey)
 	z, _ := keyExchangePrivateKey.Curve.ScalarMult(x, y, keyExchangePrivateKey.D.Bytes())
+
 	zBytes := z.Bytes()
 	zBytesB64URL := base64.StdEncoding.EncodeToString(zBytes)
 
@@ -237,9 +260,16 @@ func CreateKeyExchangeResponseClaims(requestClaims KeyRequestBody, devicePublicK
 	}
 
 	//serialize the body to prepare for encryption
-	jweBodyCompact, _ := json.Marshal(jweBody)
+	jweBodyCompact, err := json.Marshal(jweBody)
+
+	if err != nil {
+		return "", err
+	}
 
 	//encrypt with the device public key
-	jwe := EncryptTokenWithA256GCM(jweBodyCompact, devicePublicKey, requestClaims.JWECrypto.Apv)
-	return jwe
+	jwe, err := EncryptTokenWithA256GCM(jweBodyCompact, devicePublicKey, requestClaims.JWECrypto.Apv)
+	if err != nil {
+		return "", err
+	}
+	return jwe, nil
 }

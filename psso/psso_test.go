@@ -24,7 +24,7 @@ oxR6sWdoIVD5bGcEav9WkZfNFJ1ye4iYqpBB7i0Z/rJuCUQXcXq+OyKZHQ==
 // var deviceSigningPublicKeyBlock, _ = pem.Decode(devicePublicKeyPemBytes)
 // var deviceSigningPublicKey, _ = x509.ParsePKIXPublicKey(deviceSigningPublicKeyBlock.Bytes)
 
-func staticKeystore() *JWKS {
+func staticKeystore() (*JWKS, error) {
 	jwks := new(JWKS)
 	jwks.D = "kwL0qQQhZWnyJRBoI4e47K_tehCfVuoJsQmZAZPXaBs"
 	jwks.KID = "nWRIaub3DgG3w-5vlY-gZxmbPVHsa3Vddph_dBnI1Jc"
@@ -37,31 +37,39 @@ AwEHoUQDQgAEnIrkBzeNCAHBGSCTs4lbDGBn4yN7phOkG7XoPFMDykaK6v8S1PlI
 `
 
 	pemBytes := []byte(jwks.Pem)
-	pemblock, _ := pem.Decode(pemBytes)
+	pemblock, p := pem.Decode(pemBytes)
+	if p == nil {
+
+		return nil, fmt.Errorf("staticKeystore: bad PEM")
+
+	}
 	jwkPrivKey, err := x509.ParseECPrivateKey(pemblock.Bytes)
 	if err != nil {
 		fmt.Printf("%v", err)
-		panic(err)
+		return nil, err
 	}
 	jwks.PrivateKey = *jwkPrivKey
 
 	jwks.X = "nIrkBzeNCAHBGSCTs4lbDGBn4yN7phOkG7XoPFMDykY"
 	jwks.Y = "iur_EtT5SNhnl6D-LzC_jmDjrTeEEQU8W9mm3T9dN0k"
 
-	return jwks
+	return jwks, nil
 }
 
 func TestPSSOV1(t *testing.T) {
 
-	deviceSigningPublicKey := ECPublicKeyFromPEM(devicePublicKeyPem)
+	deviceSigningPublicKey, err := ECPublicKeyFromPEM(devicePublicKeyPem)
+	if err != nil {
+		t.FailNow()
+	}
 
 	//Verifying incoming JWT signature with deviceSigningPublicKey, pull out username and password from JWT and compare against known valid
 	// username and password, create an ID token and refresh tokena and send back JWE (encrypted JWT)
 
 	//get user claims. If signature is invalid, it will not return.
-	userClaims := VerifyJWTAndReturnUserClaims(incomingPSSOV1JWT, deviceSigningPublicKey)
+	userClaims, err := VerifyJWTAndReturnUserClaims(incomingPSSOV1JWT, deviceSigningPublicKey)
 
-	if userClaims == nil {
+	if err != nil {
 		t.FailNow()
 	}
 
@@ -79,10 +87,19 @@ func TestPSSOV1(t *testing.T) {
 	//sent in to generate a shared secret used to encrypt the data.
 	// jwe := EncyptIDTokenWithA256GCM(signedToken, "refresh", deviceSigningPublicKey, []byte(userClaims.JWECrypto.Apv))
 
-	jwe := CreateIDTokenResponse(*userClaims, "liz", "Liz Appleseed", []string{"admin"}, "liz@twocanoes.com", "liz@twocanoes.com", "refresh", &staticKeystore().PrivateKey, staticKeystore().KID, deviceSigningPublicKey)
-	if jwe == "" {
+	jwksKeystore, err := staticKeystore()
+
+	if err != nil {
+		t.FailNow()
+
+	}
+	jwksPrivateKey := jwksKeystore.PrivateKey
+	jwe, err := CreateIDTokenResponse(*userClaims, "liz", "Liz Appleseed", []string{"admin"}, "liz@twocanoes.com", "liz@twocanoes.com", "refresh", &jwksPrivateKey, jwksKeystore.KID, deviceSigningPublicKey)
+
+	if err != nil {
 		t.FailNow()
 	}
+	fmt.Println(jwe)
 
 }
 func TestPSSOV2GenerateCert(t *testing.T) {
@@ -98,36 +115,43 @@ func TestPSSOV2KeyExchange(t *testing.T) {
 
 }
 func PSSOV2(t *testing.T, requestJWT string) {
-	deviceSigningPublicKey := ECPublicKeyFromPEM(devicePublicKeyPem)
+	deviceSigningPublicKey, err := ECPublicKeyFromPEM(devicePublicKeyPem)
+
+	if err != nil {
+		t.FailNow()
+	}
 
 	//Verifying incoming JWT signatur with deviceSigningPublicKey, pull out username and password from JWT and compare against known valid
 	// username and password, create an ID token and refresh tokena and send back JWE (encrypted JWT)
 	//get user claims. If signature is invalid, it will not return.
-	keyRequestClaims := VerifyJWTAndReturnKeyRequestClaims(requestJWT, deviceSigningPublicKey)
-	// TODO: test as well
-	if keyRequestClaims == nil {
+	keyRequestClaims, err := VerifyJWTAndReturnKeyRequestClaims(requestJWT, deviceSigningPublicKey)
+
+	if err != nil {
 		t.FailNow()
+
 	}
 
 	if keyRequestClaims.RequestType == "key_request" {
 
-		jwe := CreateKeyRequestResponseClaims(*keyRequestClaims, deviceSigningPublicKey)
-		if jwe == "" {
-
+		jwe, err := CreateKeyRequestResponseClaims(*keyRequestClaims, deviceSigningPublicKey)
+		if err != nil {
 			t.FailNow()
-
 		}
+		fmt.Println(jwe)
+
 	} else if keyRequestClaims.KeyPurpose == "user_unlock" {
 
-		deviceSigningPublicKey := ECPublicKeyFromPEM(devicePublicKeyPem)
-
-		jwe := CreateKeyExchangeResponseClaims(*keyRequestClaims, deviceSigningPublicKey)
-
-		if jwe == "" {
-
+		deviceSigningPublicKey, err := ECPublicKeyFromPEM(devicePublicKeyPem)
+		if err != nil {
 			t.FailNow()
-
 		}
+
+		jwe, err := CreateKeyExchangeResponseClaims(*keyRequestClaims, deviceSigningPublicKey)
+
+		if err != nil {
+			t.FailNow()
+		}
+		fmt.Println(jwe)
 	} else {
 		t.FailNow()
 	}

@@ -28,7 +28,7 @@ import (
 //-----END PUBLIC KEY-----
 
 // Output: TokenBody struct. This is claims in the request JWT.
-func VerifyJWTAndReturnUserClaims(requestPSSOV1JWT string, deviceSigningPublicKey any) *IDTokenRequestBody {
+func VerifyJWTAndReturnUserClaims(requestPSSOV1JWT string, deviceSigningPublicKey any) (*IDTokenRequestBody, error) {
 
 	//take the tokenString sent in and parse it into a Go JWT
 	token, err := jwt.ParseSigned(requestPSSOV1JWT)
@@ -49,7 +49,7 @@ func VerifyJWTAndReturnUserClaims(requestPSSOV1JWT string, deviceSigningPublicKe
 		fmt.Println(err)
 		panic(err)
 	}
-	return tokenBody
+	return tokenBody, nil
 
 }
 
@@ -69,16 +69,13 @@ func VerifyJWTAndReturnUserClaims(requestPSSOV1JWT string, deviceSigningPublicKe
 //-----END PUBLIC KEY-----
 
 // Output: TokenBody struct. This is claims in the request JWT.
-func VerifyJWTAndReturnKeyRequestClaims(requestPSSOV2JWT string, deviceSigningPublicKey any) *KeyRequestBody {
+func VerifyJWTAndReturnKeyRequestClaims(requestPSSOV2JWT string, deviceSigningPublicKey any) (*KeyRequestBody, error) {
 
 	//take the tokenString sent in and parse it into a Go JWT
 	claims, err := jwt.ParseSigned(requestPSSOV2JWT)
 
 	if err != nil {
-		panic(err)
-	}
-	if claims == nil {
-		panic(claims)
+		return nil, err
 	}
 
 	// pull out the body to verify the signature
@@ -88,9 +85,9 @@ func VerifyJWTAndReturnKeyRequestClaims(requestPSSOV2JWT string, deviceSigningPu
 	//Verify signature and populate TokenBody with claims
 	if err = claims.Claims(deviceSigningPublicKey, &keyRequestBody); err != nil {
 		fmt.Println(err)
-		panic(err)
+		return nil, err
 	}
-	return keyRequestBody
+	return keyRequestBody, nil
 
 }
 
@@ -117,7 +114,7 @@ Email: "liz@twocanoes.com"
 // Output: string. JWT in serialized / dot notation format. Example output:
 // eyJhbGciOiJFUzI1NiIsImtpZCI6Im5XUklhdWIzRGdHM3ctNXZsWS1nWnhtYlBWSHNhM1ZkZHBoX2RCbkkxSmMiLCJ0eXAiOiJKV1QifQ.eyJhdWQiOiJodHRwczovL2lkcC50d29jYW5vZXMuY29tL3Blc3RvL3Rva2VuIiwiZW1haWwiOiJsaXpAdHdvY2Fub2VzLmNvbSIsImV4cCI6MTcxNDc2MTI2MSwiZ3JvdXBzIjpbImFkbWluIl0sImlhdCI6MTcxNDc2MTU2MSwiaXNzIjoicHNzbyIsIm5hbWUiOiJMaXogQXBwbGVzZWVkIiwibm9uY2UiOiJodHRwczovL2lkcC50d29jYW5vZXMuY29tL3Blc3RvL3Rva2VuIiwic3ViIjoibGl6IiwidXBuIjoibGl6QHR3b2Nhbm9lcy5jb20ifQ.A7_TWJrDY_So_bqEEzndiuoLRnWuuRFmHOBr_ocnyMMLb49Tb6yXO81TYf3_3ajvemxL04AhgPhIH_HVLs-aPg
 
-func SignClaims(servicePrivateKey *ecdsa.PrivateKey, keyID string, idClaims interface{}) string {
+func SignClaims(servicePrivateKey *ecdsa.PrivateKey, keyID string, idClaims interface{}) (string, error) {
 
 	//setup key used for signing.
 	var key jose.JSONWebKey
@@ -132,7 +129,7 @@ func SignClaims(servicePrivateKey *ecdsa.PrivateKey, keyID string, idClaims inte
 
 	if err != nil {
 		fmt.Printf("%v", err)
-		panic(err)
+		return "", err
 	}
 
 	//sign the id claims and put in dot format
@@ -140,10 +137,10 @@ func SignClaims(servicePrivateKey *ecdsa.PrivateKey, keyID string, idClaims inte
 
 	if err != nil {
 		fmt.Printf("%v", err)
-		panic(err)
+		return "", err
 
 	}
-	return jwt
+	return jwt, nil
 }
 
 // EncryptTokenWithA256GCM
@@ -154,7 +151,7 @@ func SignClaims(servicePrivateKey *ecdsa.PrivateKey, keyID string, idClaims inte
 // deviceEncryptionPublicKey. pointer to ecdsa.PublicKey. Device public encryption key for signing.
 // apv: string. From request claims. Example: AAAABUFwcGxlAAAAQQTsT8XOWJNFAFsc9yAGmIEBXjMX-az4nYpbwBHuavSOxKCR0KeIT1rQzBOWFqkbrly19Dt2ThTXwoUeaApU4dVSAAAAJDkzMTdFODEwLUM1RTYtNDE2RC1BQTQ4LTM1MEM3NTA3NUREMg
 // Output: JWE in dot notation format. Example: eyJlbmMiOiJBMjU2R0NNIiwia2lkIjoiIiwiZXBrIjp7InkiOiJfa1RMNmpfb3dCVG5DMnhpNUxYYTMzTmhZVXhuQ015M0ZUdVI4NVYzc3E0IiwieCI6IkJDbjhvWFVURXV0QUJ6T1A3ME1EYmRFNzFNVHRJUTdvdUtaS2xBclB0Uk0iLCJrdHkiOiJFQyIsImNydiI6IlAtMjU2In0sImFwdSI6IkFBQUFCVUZRVUV4RkFBQUFRUVFFS2Z5aGRSTVM2MEFITTRfdlF3TnQwVHZVeE8waER1aTRwa3FVQ3MtMUVfNUV5LW9fNk1BVTV3dHNZdVMxMnQ5ellXRk1ad2pNdHhVN2tmT1ZkN0t1IiwidHlwIjoicGxhdGZvcm1zc28tbG9naW4tcmVzcG9uc2Urand0IiwiYWxnIjoiRUNESC1FUyIsImFwdiI6IkFBQUFCVUZ3Y0d4bEFBQUFRUVRzVDhYT1dKTkZBRnNjOXlBR21JRUJYak1YLWF6NG5ZcGJ3Qkh1YXZTT3hLQ1IwS2VJVDFyUXpCT1dGcWticmx5MTlEdDJUaFRYd29VZWFBcFU0ZFZTQUFBQUpEa3pNVGRGT0RFd0xVTTFSVFl0TkRFMlJDMUJRVFE0TFRNMU1FTTNOVEEzTlVSRU1nIn0..AAAAAAAAAAAAAAAA.u9i9co8lNsbBF8b3PbjO95c47Xq2E4O-jeK5cTk6oIs3DSQ24s3KRXgH5MY_lpMbo8UVpAsoyie7S6kBQj1w2wMNo2wkCSGhk6hpjvcTr6PbT653uK9MRNyg1cJ_WfaVPxYS801mO2-DLOUSkXM_44pTWAMslLIFyfu8mxwuaQt7VjXhrUV0VpszXVXBMpEzjFiNasOxTDrk_wz-9GpzjDYYEzAWep39UbsRPwFTJ2LrWzyDuVbQHYYf9fJRYc11XQ6cdQJRW4HGW_j84kvbd2PwOAo_rFLczfj-Meaq1D_4XdecG-Hwf8p-FXuVW5tsgWFt6OLAjT6Zjkhm0QV_nBHw3R5NNHbnNNuOdQkyVUPhxvCrG6j4mmQ2T_40rh1ymK0jOg19fTMYCFUEzWycTurA53UNh-NcTJQWQruAELml91cx_qhgyE7T1o6O6RVua7qBOIqc04BjT_60ePDqj_tj5q9Kla5xPG3KC7UeP5uKbUtp7bFm8tImMCUPchB4ukc3HK8TCux6f1GH4BD3sJbXlE5UnWxS3j01BIh62Eh2HkMLzAdZHtVT_XBIxZdbeUbgcz1DygV0CQHM-DufvTpDX6X0fOvRbt3mLth9B126IP6-2tjxOp8oT_cgNrhVe_knM4FZ5tzpcp6v_I2bYn-HVBqavSNLu30ka7GcVIBO5hKi_c7TYuq6gcGUGfkfVfeLHcqLKKM-q26cugsiF4cWOEf_a6j0b9aUdw3B7Ny8EUsGQOa_-_Z8LcmgeshxRWPRuSAOMqa32nJo6Usk27BlxOIRkN679K2i7PZ7_Es5iqPn9vm8dHJIWFpoyKlZ3bEgVvCClosgDpQ5ZWt2g8_BJmAvkF2M8mgH0AGfOWQPJ5kPKBrZFUBBvuEE1PTf2mhtjCNUpzu85B7LmoV8WRNEZxykcaXunMJQijsryanW0n4MfFDJ6kx_cJ8UMj-kVoF2W5K7jCXtsv3omBVV3Sgd1U_YZb9NcB8_o6k0NIZrhiqAmhpthn7_lKfjuI_NaK4wXEZCLQeUisWIiWjaJ9KZ-Gc_ZKyOpXSMIkpA1K85RBrlI2hZ2VGNLfOLB9YWyvOLt-Bs2Ky4fBbtRCnreLUyow1SfDnHq9CbA-PQr9939F7pXqegYa5AEA.PSsZVUIKU1UrvAfOHmZaGA
-func EncryptTokenWithA256GCM(jweBodyCompact []byte, deviceEncryptionPublicKey *ecdsa.PublicKey, apv string) string {
+func EncryptTokenWithA256GCM(jweBodyCompact []byte, deviceEncryptionPublicKey *ecdsa.PublicKey, apv string) (string, error) {
 
 	//To encrypt the input bytes, the encryption key needs to be shared by both sides (service and the device). To achieve this,
 	//ECDH-ES (Eliptic Curve Diffe-Heindmen Ephemeral Static) is used to generate the symmetric key. On the service side,
@@ -169,7 +166,7 @@ func EncryptTokenWithA256GCM(jweBodyCompact []byte, deviceEncryptionPublicKey *e
 
 	if err != nil {
 		fmt.Println("error making ephemeral key")
-		return ""
+		return "", err
 	}
 
 	//get apu (inform about the key)
@@ -183,7 +180,11 @@ func EncryptTokenWithA256GCM(jweBodyCompact []byte, deviceEncryptionPublicKey *e
 
 	//user the shared secret to create a cipher that will be used to encrypt the user info.
 	cipherBlock, _ := aes.NewCipher(sharedSecret)
-	aesgcm, _ := cipher.NewGCM(cipherBlock)
+	aesgcm, err := cipher.NewGCM(cipherBlock)
+
+	if err != nil {
+		return "", err
+	}
 
 	//We need to send the public key part of the ephemeral key to the device side. This needs to be in the header and in JSON.
 	ephemeralPublicKey := &EphemeralPublicKey{
@@ -202,7 +203,11 @@ func EncryptTokenWithA256GCM(jweBodyCompact []byte, deviceEncryptionPublicKey *e
 	}
 
 	//convert the headers to JSON
-	jweHeadersCompact, _ := json.Marshal(jweHeaders)
+	jweHeadersCompact, err := json.Marshal(jweHeaders)
+
+	if err != nil {
+		return "", err
+	}
 
 	//a Nonce is included both in the encryption process and in the return toke so the receive can decrypt the data successfully.
 	nonce := createNonce()
@@ -215,7 +220,7 @@ func EncryptTokenWithA256GCM(jweBodyCompact []byte, deviceEncryptionPublicKey *e
 	ciphertext = ciphertext[:len(ciphertext)-16]
 
 	// build token
-	return base64.RawURLEncoding.EncodeToString(jweHeadersCompact) + ".." + base64.RawURLEncoding.EncodeToString(nonce) + "." + base64.RawURLEncoding.EncodeToString(ciphertext) + "." + base64.RawURLEncoding.EncodeToString(tag)
+	return base64.RawURLEncoding.EncodeToString(jweHeadersCompact) + ".." + base64.RawURLEncoding.EncodeToString(nonce) + "." + base64.RawURLEncoding.EncodeToString(ciphertext) + "." + base64.RawURLEncoding.EncodeToString(tag), nil
 }
 
 // return a random, 12 byte nonce.
