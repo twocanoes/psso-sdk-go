@@ -34,10 +34,7 @@ func VerifyJWTAndReturnUserClaims(requestPSSOV1JWT string, deviceSigningPublicKe
 	token, err := jwt.ParseSigned(requestPSSOV1JWT)
 
 	if err != nil {
-		panic(err)
-	}
-	if token == nil {
-		panic(token)
+		return nil, err
 	}
 
 	// pull out the body to verify the signature
@@ -47,7 +44,7 @@ func VerifyJWTAndReturnUserClaims(requestPSSOV1JWT string, deviceSigningPublicKe
 	//Verify signature and populate TokenBody with claims
 	if err = token.Claims(deviceSigningPublicKey, &tokenBody); err != nil {
 		fmt.Println(err)
-		panic(err)
+		return nil, err
 	}
 	return tokenBody, nil
 

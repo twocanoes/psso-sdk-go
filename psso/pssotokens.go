@@ -168,6 +168,10 @@ func CreateIDTokenResponse(requestClaims IDTokenRequestBody, shortname string, f
 	}
 
 	jwe, err := EncryptTokenWithA256GCM(jweBodyCompact, devicePublicKey, requestClaims.JWECrypto.Apv)
+
+	if err != nil {
+		return "", err
+	}
 	return jwe, nil
 }
 
