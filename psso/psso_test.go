@@ -67,12 +67,13 @@ func TestPSSOV1(t *testing.T) {
 	// username and password, create an ID token and refresh tokena and send back JWE (encrypted JWT)
 
 	//get user claims. If signature is invalid, it will not return.
-	userClaims, err := VerifyJWTAndReturnUserClaims(incomingPSSOV1JWT, deviceSigningPublicKey)
+	userClaims, userTokenHeader, err := VerifyJWTAndReturnUserClaims(incomingPSSOV1JWT, deviceSigningPublicKey)
 
 	if err != nil {
 		t.FailNow()
 	}
 
+	fmt.Println(userTokenHeader)
 	//get the username and password sent in thte request
 	claimUsername := userClaims.Username
 	claimPassword := userClaims.Password

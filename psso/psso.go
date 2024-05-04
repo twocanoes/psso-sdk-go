@@ -28,13 +28,13 @@ import (
 //-----END PUBLIC KEY-----
 
 // Output: TokenBody struct. This is claims in the request JWT.
-func VerifyJWTAndReturnUserClaims(requestPSSOV1JWT string, deviceSigningPublicKey any) (*IDTokenRequestBody, error) {
+func VerifyJWTAndReturnUserClaims(requestPSSOV1JWT string, deviceSigningPublicKey any) (*IDTokenRequestBody, []jose.Header, error) {
 
 	//take the tokenString sent in and parse it into a Go JWT
 	token, err := jwt.ParseSigned(requestPSSOV1JWT)
 
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// pull out the body to verify the signature
@@ -44,9 +44,9 @@ func VerifyJWTAndReturnUserClaims(requestPSSOV1JWT string, deviceSigningPublicKe
 	//Verify signature and populate TokenBody with claims
 	if err = token.Claims(deviceSigningPublicKey, &tokenBody); err != nil {
 		fmt.Println(err)
-		return nil, err
+		return nil, nil, err
 	}
-	return tokenBody, nil
+	return tokenBody, token.Headers, nil
 
 }
 
