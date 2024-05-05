@@ -134,13 +134,13 @@ type IDTokenResponseBody struct {
 //
 // Return Value: string. JWT token with user ID info in dot notation. Example: "eyJlbmMiOiJBMjU2R0NNIiwia2lkIjoiIiwiZXBrIjp7InkiOiJtYU9RNWRhUVJQWHhTVUZLTmtOSmFOckUzYnlTbFVvTWNoNWt5RVpKUEpJIiwieCI6IjRETFRKNDVtb3pmVjJLTDRJUUJUWGN2R29HSmc0UjRVaDdwRTE5aHVmUzgiLCJrdHkiOiJFQyIsImNydiI6IlAtMjU2In0sImFwdSI6IkFBQUFCVUZRVUV4RkFBQUFRUVRnTXRNbmptYWpOOVhZb3ZnaEFGTmR5OGFnWW1EaEhoU0h1a1RYMkc1OUw1bWprT1hXa0VUMThVbEJTalpEU1dqYXhOMjhrcFZLREhJZVpNaEdTVHlTIiwidHlwIjoicGxhdGZvcm1zc28tbG9naW4tcmVzcG9uc2Urand0IiwiYWxnIjoiRUNESC1FUyIsImFwdiI6IkFBQUFCVUZ3Y0d4bEFBQUFRUVRzVDhYT1dKTkZBRnNjOXlBR21JRUJYak1YLWF6NG5ZcGJ3Qkh1YXZTT3hLQ1IwS2VJVDFyUXpCT1dGcWticmx5MTlEdDJUaFRYd29VZWFBcFU0ZFZTQUFBQUpEZEVOekZHT0VJMExURkVSVGN0TkVZNE9TMDRRek5CTFRJeE1FUXhOakZHTXpoQlF3In0..m3jFtRsFFYCJfEX6.hFd4vIvPfRf87NrOfYUoxIWWevc4cEyj9DOA4w6OXi5rfUeNg0KX9Vwa7ZqAgaHkiO9sdD1NaCNRdZ0Q5rICoNBWEbHKpTFvOpp7j_Aq2hbxwHZV62JG63keMPT17iQ68v7-mN0NB7LXLuhpx95zIQxg5xTTu0JcrsAu1mAvB7iWRBBDhgnk6YtMzlRrMiuuVE-rjx7fSir4ri2f9Km4zvwE6VtDMO6FnwfOMO0TB2wvFEFIkWHpEp0dpgnyLCoK0UeaCbQ0oWVNpOdgNk6vWXak6c9wvhjXJlo4kVfdV5yEQlhL6WquiN9KeEhFro_4BjyBON1Q6_hU8XzzbNtZFyjC31R22ClBNnVG4Z_YaZ67bCTbLijXxFGjsGeDyFYQJWb1p62kJt5Ba3wd9dzV5xer8L86q5L2ZAJizag11kg3mZZaGa_OgrEuew2NlcrwgLhfiroc4fs-p4gfdf3N9ThJIpSQGqvtK0IXE_XzaU9EVICozI__ed9tibsaGrqtpyE4bXK1WkuxLgJI55GbABypS6grdr-gcKjcFB3su_Y--j0ovjpy1hgQahYmYLz5TniTgE7yjmMEEk_arroSpOTxamVx3WbR5ukEO1-PYp9iPaL7jeVxohS9dlVwsYyao5LIvU3Bu4PK4PbwhzBvXhwUp9pBgqjFbdJ44kIftmKNy2obocbdR7t2ZiibkwNUXbY_bYJcy28KZ6QRei1Nl6LvdzHI_maHlIFiVp3nYmD2YQYyntZFvKP-T0GlL0LgxOJr6_vswQ6DvKuJXvs4JjxJAEHrX5yWsfPjQc9l3iTGgb6vPGgh0nx26JND71Ij.6dI5jzJ-ouTEcvbfH34ixw
 
-func CreateIDTokenResponse(requestClaims IDTokenRequestBody, shortname string, fullname string, groups []string, email string, upn string, refreshToken string, servicePrivateKey *ecdsa.PrivateKey, serviceKeyID string, devicePublicKey *ecdsa.PublicKey) (string, error) {
+func CreateIDTokenResponse(issuerAPIHostName string, requestClaims IDTokenRequestBody, shortname string, fullname string, groups []string, email string, upn string, refreshToken string, servicePrivateKey *ecdsa.PrivateKey, serviceKeyID string, devicePublicKey *ecdsa.PublicKey) (string, error) {
 
 	// build up user information to send back
 	returnClaims := &IDTokenClaims{
 		Exp:     int(time.Now().Unix()),
 		Iat:     int(time.Now().Add(time.Minute * 5).Unix()),
-		Iss:     requestClaims.Iss,
+		Iss:     issuerAPIHostName,
 		Aud:     requestClaims.Aud, // "psso",
 		Nonce:   requestClaims.Nonce,
 		Groups:  groups,
