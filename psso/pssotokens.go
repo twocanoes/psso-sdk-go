@@ -138,8 +138,8 @@ func CreateIDTokenResponse(issuerAPIHostName string, requestClaims IDTokenReques
 
 	// build up user information to send back
 	returnClaims := &IDTokenClaims{
-		Exp:     int(time.Now().Unix()),
-		Iat:     int(time.Now().Add(time.Minute * 5).Unix()),
+		Exp:     int(time.Now().Add(time.Hour).Unix()),
+		Iat:     int(time.Now().Unix()),
 		Iss:     issuerAPIHostName,
 		Aud:     "psso",
 		Nonce:   requestClaims.Nonce,
