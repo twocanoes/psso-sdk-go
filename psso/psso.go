@@ -169,7 +169,7 @@ func EncryptTokenWithA256GCM(jweBodyCompact []byte, deviceEncryptionPublicKey *e
 	//get apu (inform about the key)
 	apu := buildAPU(ephemeral)
 
-	//generate a symeetric key using info about the ephermal key, info about the key on the receiver side,
+	//generate a symmetric key using info about the ephermal key, info about the key on the receiver side,
 	// the key on the service side, and the public key of the the receiver.
 	apvRaw, _ := base64.RawURLEncoding.DecodeString(apv)
 

@@ -142,7 +142,7 @@ func CreateIDTokenResponse(requestClaims IDTokenRequestBody, shortname string, f
 		Iat:     int(time.Now().Add(time.Minute * 5).Unix()),
 		Iss:     requestClaims.Iss,
 		Aud:     requestClaims.Aud, // "psso",
-		Nonce:   requestClaims.Aud,
+		Nonce:   requestClaims.Nonce,
 		Groups:  groups,
 		UPN:     upn,
 		Subject: shortname,
