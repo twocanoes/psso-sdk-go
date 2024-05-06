@@ -110,6 +110,7 @@ username and password and returning user infomation.
 ### Input:
 
 #### requestPSSOV2JWT: String. Token sent to the token endpoint as a string.
+
 #### deviceSigningPublicKey: any. The public key portion of the device signing key during device provisioning. Uploaded by the device. Example:
 	-----BEGIN PUBLIC KEY-----
 	FkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAELOFf3yRXGWbDaS339MS2ehFfkC7x
@@ -125,13 +126,13 @@ certificatePrivateKey, certificate, err := genCert(requestClaims.Username)
 ### Purpose: When a KeyRequest JWT is requested (filevault/keychain keying setup), these claims are sent back. A certificate is returned. This certificate is used for persistent token authentication on the device.
 
 ### Input:
+
 #### requestClaims: KeyRequestBody. Incoming request. Used to get the Apv from the request to send back.
 devicePublicKey: pointer to device public key. Used to encrypted response
 
-#### Return Value:
+### Return Value:
 string. Encrypted JWT (JWE) in dot notation.
 
-	
 
 ## func CreateKeyExchangeResponseClaims(requestClaims KeyRequestBody, devicePublicKey *ecdsa.PublicKey) (string, error)
 
@@ -139,9 +140,9 @@ string. Encrypted JWT (JWE) in dot notation.
 
 ### Input:
 
-### requestClaims: KeyRequestBody. Incoming request. Used to get the Apv from the request to send back.
+#### requestClaims: KeyRequestBody. Incoming request. Used to get the Apv from the request to send back.
 
-### devicePublicKey: pointer to device public key. Used to encrypted response
+#### devicePublicKey: pointer to device public key. Used to encrypted response
 
 ### Return Value:
 string. Encrypted JWT (JWE) in dot notation.
