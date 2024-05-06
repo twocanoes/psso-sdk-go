@@ -105,11 +105,11 @@ username and password and returning user infomation.
 
 ## func VerifyJWTAndReturnKeyRequestClaims(requestPSSOV2JWT string, deviceSigningPublicKey any) (*KeyRequestBody, error) 
 
-###Purpose: When a token is posted to the token endpoint and it is version 2 of the PSSO Api, the request JWT signature is checked and the claims are returned. In version 2 of the PSSO protocol, the request can either be for provision Filevault / keychain unlock (with a smart card certificate and private key), or a authentication operation to unlock Filevault or keychain. This function returns the claims to determine which operation is requested.
+### Purpose: When a token is posted to the token endpoint and it is version 2 of the PSSO Api, the request JWT signature is checked and the claims are returned. In version 2 of the PSSO protocol, the request can either be for provision Filevault / keychain unlock (with a smart card certificate and private key), or a authentication operation to unlock Filevault or keychain. This function returns the claims to determine which operation is requested.
 
 ### Input:
 
-#### requestPSSOV2JWT: String. Token sent to the token endpoint as a string. Example:
+#### requestPSSOV2JWT: String. Token sent to the token endpoint as a string.
 #### deviceSigningPublicKey: any. The public key portion of the device signing key during device provisioning. Uploaded by the device. Example:
 	-----BEGIN PUBLIC KEY-----
 	FkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAELOFf3yRXGWbDaS339MS2ehFfkC7x
@@ -128,21 +128,21 @@ certificatePrivateKey, certificate, err := genCert(requestClaims.Username)
 #### requestClaims: KeyRequestBody. Incoming request. Used to get the Apv from the request to send back.
 devicePublicKey: pointer to device public key. Used to encrypted response
 
-####Return Value:
+#### Return Value:
 string. Encrypted JWT (JWE) in dot notation.
 
 	
 
 ## func CreateKeyExchangeResponseClaims(requestClaims KeyRequestBody, devicePublicKey *ecdsa.PublicKey) (string, error)
 
-###Purpose: When a Unlock JWT is requested (filevault/keychain keying unlock), these claims are sent back.
+### Purpose: When a Unlock JWT is requested (filevault/keychain keying unlock), these claims are sent back.
 
 ### Input:
 
 ### requestClaims: KeyRequestBody. Incoming request. Used to get the Apv from the request to send back.
 
-###devicePublicKey: pointer to device public key. Used to encrypted response
+### devicePublicKey: pointer to device public key. Used to encrypted response
 
-###Return Value:
+### Return Value:
 string. Encrypted JWT (JWE) in dot notation.
 
