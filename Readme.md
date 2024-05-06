@@ -1,3 +1,66 @@
+# psso-sdk-go
+
+psso-sdk-go is a package for developing a PSSO extension server for macOS. It is written in Go and does all the crypto and the JWT token handling.
+The flow would look something like this:
+
+## Registration
+
+The PSSO extension on macOS registers a device. This can be handled through simple posting of data to an endpoint. The data required is:
+	
+	DeviceUUID          string
+	
+	DeviceSigningKey    string
+	
+	DeviceEncryptionKey string
+	
+	SignKeyID           string
+	
+	EncKeyID            string
+	
+	User                string
+
+
+These values should be stored securely in a database for the app.
+
+## Endpoints.
+
+A token endpoint should be set up. Form data will be posted to the endpoint with 2 values: PSSO version number and a JWT. 
+
+### PSSO V1
+If it is PSSO version 1, then it is a user authentication.  The JWT contains user authentication information. The claims can be extracted using:
+
+	func VerifyJWTAndReturnUserClaims(requestPSSOV1JWT string, deviceSigningPublicKey any) (*IDTokenRequestBody, []jose.Header, error)
+
+This returns the claims and the header. The username and password should be verified. A response is then created with
+
+	func CreateIDTokenResponse(issuerAPIHostName string, requestClaims IDTokenRequestBody, shortname string, fullname string, groups []string, email string, upn string, refreshToken string, servicePrivateKey *ecdsa.PrivateKey, serviceKeyID string, devicePublicKey *ecdsa.PublicKey) (string, error)
+
+Upon success, this string should be returned to the HTTP POST.
+
+### PSSO V2
+
+If it is PSSO version 2, then the JWT either contains a key request or user unlock. This JWT can be verified and decoded using:
+
+	## func VerifyJWTAndReturnKeyRequestClaims(requestPSSOV2JWT string, deviceSigningPublicKey any) (*KeyRequestBody, error) 
+
+This returns the KeyRequestClaims. The  KeyRequestClaims.KeyPurpose will contain either "user\_unlock" or "key\_request".
+
+#### key_request
+
+Key request sets up a certificate that will be used when the user needs to unlock filevault or the user's keychain. The response is created using:
+
+	jweString, err = psso.CreateKeyRequestResponseClaims(*keyRequestClaims, deviceEncryptionPublicKey.(*ecdsa.PublicKey))
+	
+
+#### user_unlock
+
+The user_unlock unlocks the keychain or filevault. It is processed using:
+
+	jweString, err = psso.CreateKeyExchangeResponseClaims(*keyRequestClaims, deviceEncryptionPublicKey.(*ecdsa.PublicKey))
+
+
+# API DOCUMENTATION
+
 ## func VerifyJWTAndReturnUserClaims(requestPSSOV1JWT string, deviceSigningPublicKey any) (*IDTokenRequestBody, []jose.Header, error)
 
 Purpose: Take the token posted to the token endpoint, verify the signature, and return the claims. This request is for verifying the
@@ -70,7 +133,9 @@ string. Encrypted JWT (JWE) in dot notation.
 
 	
 
-## func CreateKeyExchangeResponseClaims(requestClaims KeyRequestBody, devicePublicKey *ecdsa.PublicKey) (string, error)// Purpose: When a Unlock JWT is requested (filevault/keychain keying unlock), these claims are sent back.
+## func CreateKeyExchangeResponseClaims(requestClaims KeyRequestBody, devicePublicKey *ecdsa.PublicKey) (string, error)
+
+###Purpose: When a Unlock JWT is requested (filevault/keychain keying unlock), these claims are sent back.
 
 ### Input:
 
