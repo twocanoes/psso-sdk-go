@@ -95,7 +95,7 @@ func TestPSSOV1(t *testing.T) {
 
 	}
 	jwksPrivateKey := jwksKeystore.PrivateKey
-	jwe, err := CreateIDTokenResponse(*userClaims, "liz", "Liz Appleseed", []string{"admin"}, "liz@twocanoes.com", "liz@twocanoes.com", "refresh", &jwksPrivateKey, jwksKeystore.KID, deviceSigningPublicKey)
+	jwe, err := CreateIDTokenResponse("https://idp.twocanoes.com/psso", *userClaims, "liz", "Liz Appleseed", []string{"admin"}, "liz@twocanoes.com", "liz@twocanoes.com", "refresh", &jwksPrivateKey, jwksKeystore.KID, deviceSigningPublicKey)
 
 	if err != nil {
 		t.FailNow()
@@ -134,7 +134,7 @@ func PSSOV2(t *testing.T, requestJWT string) {
 
 	if keyRequestClaims.RequestType == "key_request" {
 
-		jwe, err := CreateKeyRequestResponseClaims(*keyRequestClaims, deviceSigningPublicKey)
+		jwe, err := CreateKeyRequestResponseClaims(*keyRequestClaims, deviceSigningPublicKey, []byte("testkey"))
 		if err != nil {
 			t.FailNow()
 		}
@@ -147,7 +147,7 @@ func PSSOV2(t *testing.T, requestJWT string) {
 			t.FailNow()
 		}
 
-		jwe, err := CreateKeyExchangeResponseClaims(*keyRequestClaims, deviceSigningPublicKey)
+		jwe, err := CreateKeyExchangeResponseClaims(*keyRequestClaims, deviceSigningPublicKey, []byte("testkey"))
 
 		if err != nil {
 			t.FailNow()

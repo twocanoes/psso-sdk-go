@@ -1,8 +1,11 @@
 package psso
 
 import (
+	"crypto/aes"
+	"crypto/cipher"
 	"crypto/ecdsa"
 	"crypto/elliptic"
+	"crypto/rand"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
@@ -183,15 +186,32 @@ func CreateIDTokenResponse(issuerAPIHostName string, requestClaims IDTokenReques
 // Return Value:
 // string. Encrypted JWT (JWE) in dot notation.
 
-func CreateKeyRequestResponseClaims(requestClaims KeyRequestBody, devicePublicKey *ecdsa.PublicKey) (string, error) {
+func CreateKeyRequestResponseClaims(requestClaims KeyRequestBody, devicePublicKey *ecdsa.PublicKey, contextSymmetricKey []byte) (string, error) {
+
 	certificatePrivateKey, certificate, err := genCert(requestClaims.Username)
 
 	if err != nil {
 		return "", err
 	}
+	aes, err := aes.NewCipher([]byte(contextSymmetricKey))
+	if err != nil {
+		return "", err
+	}
+
+	gcm, err := cipher.NewGCM(aes)
+	if err != nil {
+		return "", err
+	}
+	nonce := make([]byte, gcm.NonceSize())
+	_, err = rand.Read(nonce)
+	if err != nil {
+		return "", err
+	}
+	ciphertext := gcm.Seal(nonce, nonce, certificatePrivateKey, nil)
+
 	jweBody := KeyResponseBody{
 		Certificate: base64.RawURLEncoding.EncodeToString(certificate),
-		KeyContext:  base64.RawURLEncoding.EncodeToString(certificatePrivateKey),
+		KeyContext:  base64.RawURLEncoding.EncodeToString(ciphertext),
 		IssuedAt:    int(time.Now().Unix()),
 		Expires:     int(time.Now().Add(time.Minute * 5).Unix()),
 	}
@@ -213,7 +233,7 @@ func CreateKeyRequestResponseClaims(requestClaims KeyRequestBody, devicePublicKe
 // Return Value:
 // string. Encrypted JWT (JWE) in dot notation.
 
-func CreateKeyExchangeResponseClaims(requestClaims KeyRequestBody, devicePublicKey *ecdsa.PublicKey) (string, error) {
+func CreateKeyExchangeResponseClaims(requestClaims KeyRequestBody, devicePublicKey *ecdsa.PublicKey, contextSymmetricKey []byte) (string, error) {
 
 	// When the unlock operation is requested, an ephemeral key is generated on the device side and used to generate
 	// a secret that can be used to unlock FV or keychain. The service side uses the public key of this ephemeral key
@@ -221,10 +241,27 @@ func CreateKeyExchangeResponseClaims(requestClaims KeyRequestBody, devicePublicK
 	// to unlock the keychain or filevault.
 
 	// Get the private key used to decrypt from the keycontext.
-	keyExchangePrivateKeyPEMString, err := base64.RawURLEncoding.DecodeString(requestClaims.KeyContext)
 
+	encryptedKey, err := base64.RawURLEncoding.DecodeString(requestClaims.KeyContext)
 	if err != nil {
 		return "", nil
+	}
+	aes, err := aes.NewCipher([]byte(contextSymmetricKey))
+	if err != nil {
+		return "", nil
+	}
+
+	gcm, err := cipher.NewGCM(aes)
+	if err != nil {
+		return "", nil
+	}
+
+	nonceSize := gcm.NonceSize()
+	nonce, ciphertext := encryptedKey[:nonceSize], encryptedKey[nonceSize:]
+
+	keyExchangePrivateKeyPEMString, err := gcm.Open(nil, []byte(nonce), []byte(ciphertext), nil)
+	if err != nil {
+		return "", err
 	}
 
 	keyExchangePrivateKeyBlock, p := pem.Decode(keyExchangePrivateKeyPEMString)
