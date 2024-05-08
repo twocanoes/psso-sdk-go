@@ -192,6 +192,7 @@ func EncryptTokenWithA256GCM(jweBodyCompact []byte, deviceEncryptionPublicKey *e
 	}
 	jweHeaders := ResponseHeader{
 		Encryption:         "A256GCM",
+		KeyID:              "ephemeralKey",
 		EphemeralPublicKey: *ephemeralPublicKey,
 		Type:               "platformsso-login-response+jwt",
 		Algorithm:          "ECDH-ES",
