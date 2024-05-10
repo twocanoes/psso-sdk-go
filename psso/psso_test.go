@@ -1,8 +1,7 @@
 package psso
 
 import (
-	"crypto/x509"
-	"encoding/pem"
+	"crypto/rand"
 	"fmt"
 	"testing"
 )
@@ -36,19 +35,19 @@ AwEHoUQDQgAEnIrkBzeNCAHBGSCTs4lbDGBn4yN7phOkG7XoPFMDykaK6v8S1PlI
 -----END EC PRIVATE KEY-----
 `
 
-	pemBytes := []byte(jwks.Pem)
-	pemblock, p := pem.Decode(pemBytes)
-	if p == nil {
+	// pemBytes := []byte(jwks.Pem)
+	// pemblock, p := pem.Decode(pemBytes)
+	// if p == nil {
 
-		return nil, fmt.Errorf("staticKeystore: bad PEM")
+	// 	return nil, fmt.Errorf("staticKeystore: bad PEM")
 
-	}
-	jwkPrivKey, err := x509.ParseECPrivateKey(pemblock.Bytes)
-	if err != nil {
-		fmt.Printf("%v", err)
-		return nil, err
-	}
-	jwks.PrivateKey = *jwkPrivKey
+	// }
+	// // jwkPrivKey, err := x509.ParseECPrivateKey(pemblock.Bytes)
+	// if err != nil {
+	// 	fmt.Printf("%v", err)
+	// 	return nil, err
+	// }
+	// jwks.PrivateKey = jwks.privateKey()
 
 	jwks.X = "nIrkBzeNCAHBGSCTs4lbDGBn4yN7phOkG7XoPFMDykY"
 	jwks.Y = "iur_EtT5SNhnl6D-LzC_jmDjrTeEEQU8W9mm3T9dN0k"
@@ -94,14 +93,21 @@ func TestPSSOV1(t *testing.T) {
 		t.FailNow()
 
 	}
-	jwksPrivateKey := jwksKeystore.PrivateKey
-	jwe, err := CreateIDTokenResponse("https://idp.twocanoes.com/psso", *userClaims, "liz", "Liz Appleseed", []string{"admin"}, "liz@twocanoes.com", "liz@twocanoes.com", "refresh", &jwksPrivateKey, jwksKeystore.KID, deviceSigningPublicKey)
+	jwksPrivateKey, err := jwksKeystore.privateKey()
+	if err != nil {
+		t.FailNow()
+
+	}
+	jwe, err := CreateIDTokenResponse("https://idp.twocanoes.com/psso", *userClaims, "liz", "Liz Appleseed", []string{"admin"}, "liz@twocanoes.com", "liz@twocanoes.com", "refresh", jwksPrivateKey, jwksKeystore.KID, deviceSigningPublicKey)
 
 	if err != nil {
 		t.FailNow()
 	}
 	fmt.Println(jwe)
 
+}
+func TestCreateJWKS(t *testing.T) {
+	CreateJWKS()
 }
 func TestPSSOV2GenerateCert(t *testing.T) {
 	incomingPSSOV2GenerateCertJWT := "ewogICJ0eXAiIDogInBsYXRmb3Jtc3NvLWtleS1yZXF1ZXN0K2p3dCIsCiAgImFsZyIgOiAiRVMyNTYiLAogICJraWQiIDogImYrUm5LV3Jpa2tzVFFOZ0J1WmhEOG9NVlJGVlBCYnBSU3NybXliZnZKQzA9Igp9.ewogICJqd2VfY3J5cHRvIiA6IHsKICAgICJhbGciIDogIkVDREgtRVMiLAogICAgImVuYyIgOiAiQTI1NkdDTSIsCiAgICAiYXB2IiA6ICJBQUFBQlVGd2NHeGxBQUFBUVFUc1Q4WE9XSk5GQUZzYzl5QUdtSUVCWGpNWC1hejRuWXBid0JIdWF2U094S0NSMEtlSVQxclF6Qk9XRnFrYnJseTE5RHQyVGhUWHdvVWVhQXBVNGRWU0FBQUFKRGt6TVRkRk9ERXdMVU0xUlRZdE5ERTJSQzFCUVRRNExUTTFNRU0zTlRBM05VUkVNZyIKICB9LAogICJleHAiIDogMTcxMzk5NzE1NCwKICAicmVxdWVzdF90eXBlIiA6ICJrZXlfcmVxdWVzdCIsCiAgIm5vbmNlIiA6ICI5MzE3RTgxMC1DNUU2LTQxNkQtQUE0OC0zNTBDNzUwNzVERDIiLAogICJ2ZXJzaW9uIiA6ICIxLjAiLAogICJyZXF1ZXN0X25vbmNlIiA6ICI4ekpnVEwrNFJKMFBENWpnZTg0MUloSEh2TjlWZ3JrUGJNTFNLZkttd2k4PSIsCiAgInJlZnJlc2hfdG9rZW4iIDogImI0ZjQ4ODUwLWZhZmItNGMyZi1iYTliLTQ3MmIwNjcxODk4MyIsCiAgImlzcyIgOiAicHNzbyIsCiAgImtleV9wdXJwb3NlIiA6ICJ1c2VyX3VubG9jayIsCiAgInN1YiIgOiAiamFwcGxlc2VlZEB0d29jYW5vZXMuY29tIiwKICAidXNlcm5hbWUiIDogImphcHBsZXNlZWRAdHdvY2Fub2VzLmNvbSIsCiAgImlhdCIgOiAxNzEzOTk2ODU0Cn0.VeRMvt9N86dAiMUCbumKYo4nqniPxVJfnwc_lz1-X7Q2tyg-lXoiRALYP_CLCnzwLTAzBq4jFRXX3kLeEVyqWQ"
@@ -131,10 +137,12 @@ func PSSOV2(t *testing.T, requestJWT string) {
 		t.FailNow()
 
 	}
+	keyExchangeKeyBytes := make([]byte, 32)
+	rand.Read(keyExchangeKeyBytes)
 
 	if keyRequestClaims.RequestType == "key_request" {
 
-		jwe, err := CreateKeyRequestResponseClaims(*keyRequestClaims, deviceSigningPublicKey, []byte("testkey"))
+		jwe, err := CreateKeyRequestResponseClaims(*keyRequestClaims, deviceSigningPublicKey, keyExchangeKeyBytes)
 		if err != nil {
 			t.FailNow()
 		}
@@ -147,7 +155,7 @@ func PSSOV2(t *testing.T, requestJWT string) {
 			t.FailNow()
 		}
 
-		jwe, err := CreateKeyExchangeResponseClaims(*keyRequestClaims, deviceSigningPublicKey, []byte("testkey"))
+		jwe, err := CreateKeyExchangeResponseClaims(*keyRequestClaims, deviceSigningPublicKey, keyExchangeKeyBytes)
 
 		if err != nil {
 			t.FailNow()

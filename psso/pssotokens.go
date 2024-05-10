@@ -18,14 +18,14 @@ import (
 // JSON Webtoken Key Store. An Asymmetric key for signing and encrypting on the server side.
 // this key is used to sign data on the service side and decrypt data from the device side
 type JWKS struct {
-	PK         string
-	Category   string
-	KID        string
-	X          string
-	Y          string
-	D          string
-	Pem        string
-	PrivateKey ecdsa.PrivateKey
+	PK       string
+	Category string
+	KID      string
+	X        string
+	Y        string
+	D        string
+	Pem      string
+	// PrivateKey ecdsa.PrivateKey
 }
 
 // Token sent from the device for authenticating the user. PSSO v1.
@@ -341,6 +341,15 @@ func CreateJWKS() (*JWKS, error) {
 	}
 
 	return jwks, nil
+}
+
+func (jwks *JWKS) privateKey() (*ecdsa.PrivateKey, error) {
+	jwkPrivKey, err := ECPrivateKeyFromPEM(jwks.Pem)
+	if err != nil {
+		return nil, err
+	}
+
+	return jwkPrivKey, nil
 }
 
 // EncodePrivateKey encodes an ECDSA private key to PEM format.
