@@ -343,7 +343,7 @@ func CreateJWKS() (*JWKS, error) {
 	return jwks, nil
 }
 
-func (jwks *JWKS) privateKey() (*ecdsa.PrivateKey, error) {
+func (jwks *JWKS) PrivateKey() (*ecdsa.PrivateKey, error) {
 	jwkPrivKey, err := ECPrivateKeyFromPEM(jwks.Pem)
 	if err != nil {
 		return nil, err
