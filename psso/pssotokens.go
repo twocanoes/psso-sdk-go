@@ -6,6 +6,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
+	"crypto/sha256"
 	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
@@ -313,4 +314,46 @@ func CreateKeyExchangeResponseClaims(requestClaims KeyRequestBody, devicePublicK
 		return "", err
 	}
 	return jwe, nil
+}
+
+func CreateJWKS() (*JWKS, error) {
+	ekey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+
+	if err != nil {
+
+		return nil, err
+	}
+	pem, err := encodePrivateKey(ekey)
+	if err != nil {
+		return nil, err
+	}
+
+	keyID := sha256.Sum256(ekey.D.Bytes())
+
+	jwks := &JWKS{
+		PK:       "jwks",
+		Category: "currentKey",
+		KID:      base64.RawURLEncoding.EncodeToString(keyID[:]),
+		X:        base64.RawURLEncoding.EncodeToString(ekey.X.Bytes()),
+		Y:        base64.RawURLEncoding.EncodeToString(ekey.Y.Bytes()),
+		D:        base64.RawURLEncoding.EncodeToString(ekey.D.Bytes()),
+		Pem:      string(pem),
+	}
+
+	return jwks, nil
+}
+
+// EncodePrivateKey encodes an ECDSA private key to PEM format.
+func encodePrivateKey(key *ecdsa.PrivateKey) ([]byte, error) {
+	derKey, err := x509.MarshalECPrivateKey(key)
+	if err != nil {
+		return nil, err
+	}
+
+	keyBlock := &pem.Block{
+		Type:  "EC PRIVATE KEY",
+		Bytes: derKey,
+	}
+
+	return pem.EncodeToMemory(keyBlock), nil
 }
