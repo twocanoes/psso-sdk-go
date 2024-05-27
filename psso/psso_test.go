@@ -93,12 +93,12 @@ func TestPSSOV1(t *testing.T) {
 		t.FailNow()
 
 	}
-	jwksPrivateKey, err := jwksKeystore.privateKey()
+	jwksPrivateKey, err := jwksKeystore.PrivateKey()
 	if err != nil {
 		t.FailNow()
 
 	}
-	jwe, err := CreateIDTokenResponse("https://idp.twocanoes.com/psso", *userClaims, "liz", "Liz Appleseed", []string{"admin"}, "liz@twocanoes.com", "liz@twocanoes.com", "refresh", jwksPrivateKey, jwksKeystore.KID, deviceSigningPublicKey)
+	jwe, err := CreateIDTokenResponse("idp.twocanoes.com", "psso", *userClaims, "liz", "Liz Appleseed", []string{"admin"}, "liz@twocanoes.com", "liz@twocanoes.com", "refresh", jwksPrivateKey, jwksKeystore.KID, deviceSigningPublicKey)
 
 	if err != nil {
 		t.FailNow()
